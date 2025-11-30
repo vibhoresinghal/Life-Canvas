@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life Canvas</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        canvas: '#1a1a1a',
+                        sidebar: '#262626',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
+            color: #e5e5e5;
+        }
+        .masonry-grid {
+            display: flex;
+            width: 100%;
+        }
+        .masonry-col {
+            padding-left: 1rem;
+            background-clip: padding-box;
+        }
+        .organic-shadow {
+            box-shadow: 2px 4px 12px rgba(0,0,0,0.15);
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        const { Plus, X, Image, Type, StickyNote, Calendar, Clock, History, Infinity, LayoutGrid } = lucide;
+
+        // --- Components ---
+
+        const Sidebar = ({ activeView, setActiveView }) => {
+            const views = [
+                { id: 'today', label: 'Today', icon: Clock },
+                { id: 'month', label: 'This Month', icon: Calendar },
+                { id: 'year', label: 'This Year', icon: History },
+                { id: 'life', label: 'This Life', icon: Infinity },
+                { id: 'past', label: 'Past', icon: LayoutGrid },
+            ];
+
+            return (
+                <div className="fixed bottom-0 left-0 right-0 md:top-0 md:left-0 md:bottom-0 md:right-auto md:w-20 bg-sidebar border-t md:border-t-0 md:border-r border-neutral-800 flex md:flex-col items-center justify-around md:justify-start md:pt-8 z-50 h-16 md:h-full">
+                    {views.map(view => {
+                        const Icon = view.icon;
+                        const isActive = activeView === view.id;
+                        return (
+                            <button
+                                key={view.id}
+                                onClick={() => setActiveView(view.id)}
+                                className={`p-3 rounded-xl transition-all duration-300 group relative ${isActive ? 'bg-white/10 text-white' : 'text-neutral-500 hover:text-white'}`}
+                                title={view.label}
+                            >
+                                <Icon size={24} />
+                                <span className="absolute left-14 bg-black px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity hidden md:block pointer-events-none">
+                                    {view.label}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        const Item = ({ item, onClick }) => {
+            // Random rotation for organic feel, memoized to stay constant for the item
+            const rotation = useMemo(() => Math.random() * 4 - 2, []); 
+
+            const baseClasses = "mb-4 rounded-lg p-4 cursor-pointer transition-transform hover:scale-[1.02] active:scale-95 organic-shadow break-inside-avoid relative group overflow-hidden";
+            const style = { transform: `rotate(${rotation}deg)` };
+
+            if (item.type === 'photo') {
+                return (
+                    <div className={`${baseClasses} bg-neutral-800 p-0`} style={style} onClick={() => onClick(item)}>
+                        <img src={item.content} alt="Memory" className="w-full h-auto object-cover" onError={(e) => e.target.src = 'https://via.placeholder.com/300?text=Invalid+Image+URL'} />
+                        {item.tags && item.tags.length > 0 && (
+                            <div className="absolute bottom-2 left-2 flex gap-1 flex-wrap">
+                                {item.tags.map(tag => (
+                                    <span key={tag} className="bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm">{tag}</span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            if (item.type === 'sticky') {
+                const colors = {
+                    yellow: 'bg-yellow-200 text-yellow-900',
+                    blue: 'bg-blue-200 text-blue-900',
+                    pink: 'bg-pink-200 text-pink-900',
+                    green: 'bg-green-200 text-green-900',
+                };
+                const colorClass = colors[item.color] || colors.yellow;
+
+                return (
+                    <div className={`${baseClasses} ${colorClass} min-h-[150px] flex flex-col justify-between`} style={style} onClick={() => onClick(item)}>
+                        <p className="font-medium whitespace-pre-wrap font-handwriting text-lg leading-snug">{item.content}</p>
+                        {item.tags && item.tags.length > 0 && (
+                            <div className="flex gap-1 flex-wrap mt-2">
+                                {item.tags.map(tag => (
+                                    <span key={tag} className="bg-black/10 text-current text-[10px] px-1.5 py-0.5 rounded">{tag}</span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            // Text type
+            return (
+                <div className={`${baseClasses} bg-transparent text-neutral-300 border border-neutral-800 hover:border-neutral-600`} style={style} onClick={() => onClick(item)}>
+                    <p className="text-lg font-light leading-relaxed">{item.content}</p>
+                    {item.tags && item.tags.length > 0 && (
+                        <div className="flex gap-1 flex-wrap mt-3">
+                            {item.tags.map(tag => (
+                                <span key={tag} className="bg-neutral-800 text-neutral-400 text-[10px] px-1.5 py-0.5 rounded">{tag}</span>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const Modal = ({ isOpen, onClose, item, onSave, onDelete }) => {
+            if (!isOpen) return null;
+
+            const [content, setContent] = useState(item?.content || '');
+            const [type, setType] = useState(item?.type || 'sticky');
+            const [color, setColor] = useState(item?.color || 'yellow');
+            const [tags, setTags] = useState(item?.tags?.join(', ') || '');
+
+            useEffect(() => {
+                if (item) {
+                    setContent(item.content);
+                    setType(item.type);
+                    setColor(item.color || 'yellow');
+                    setTags(item.tags ? item.tags.join(', ') : '');
+                } else {
+                    // Defaults for new item
+                    setContent('');
+                    setType('sticky');
+                    setColor('yellow');
+                    setTags('');
+                }
+            }, [item, isOpen]);
+
+            const handleSave = () => {
+                const tagArray = tags.split(',').map(t => t.trim()).filter(t => t);
+                onSave({
+                    id: item?.id || Date.now(),
+                    content,
+                    type,
+                    color,
+                    tags: tagArray,
+                    createdAt: item?.createdAt || new Date().toISOString(),
+                });
+                onClose();
+            };
+
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-semibold text-white">{item ? 'Edit Item' : 'New Item'}</h2>
+                            <button onClick={onClose} className="text-neutral-400 hover:text-white"><X size={20} /></button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* Type Selection */}
+                            <div className="flex gap-2 bg-neutral-800 p-1 rounded-lg">
+                                {['sticky', 'photo', 'text'].map(t => (
+                                    <button
+                                        key={t}
+                                        onClick={() => setType(t)}
+                                        className={`flex-1 py-2 rounded-md text-sm font-medium capitalize transition-colors ${type === t ? 'bg-neutral-700 text-white shadow' : 'text-neutral-400 hover:text-neutral-300'}`}
+                                    >
+                                        {t}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Content Input */}
+                            <div>
+                                {type === 'photo' ? (
+                                    <input
+                                        type="text"
+                                        placeholder="Image URL..."
+                                        value={content}
+                                        onChange={e => setContent(e.target.value)}
+                                        className="w-full bg-neutral-800 border-none rounded-lg p-3 text-white placeholder-neutral-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                ) : (
+                                    <textarea
+                                        placeholder="Write your thoughts..."
+                                        value={content}
+                                        onChange={e => setContent(e.target.value)}
+                                        rows={4}
+                                        className="w-full bg-neutral-800 border-none rounded-lg p-3 text-white placeholder-neutral-500 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                                    />
+                                )}
+                            </div>
+
+                            {/* Color Selection (Sticky only) */}
+                            {type === 'sticky' && (
+                                <div className="flex gap-3">
+                                    {['yellow', 'blue', 'pink', 'green'].map(c => (
+                                        <button
+                                            key={c}
+                                            onClick={() => setColor(c)}
+                                            className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${color === c ? 'border-white' : 'border-transparent'}`}
+                                            style={{ backgroundColor: c === 'yellow' ? '#fef08a' : c === 'blue' ? '#bfdbfe' : c === 'pink' ? '#fbcfe8' : '#bbf7d0' }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Tags */}
+                            <input
+                                type="text"
+                                placeholder="Tags (comma separated)..."
+                                value={tags}
+                                onChange={e => setTags(e.target.value)}
+                                className="w-full bg-neutral-800 border-none rounded-lg p-3 text-white placeholder-neutral-500 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                            />
+
+                            <div className="flex gap-3 pt-4">
+                                {item && (
+                                    <button onClick={() => { onDelete(item.id); onClose(); }} className="px-4 py-2 text-red-400 hover:text-red-300 text-sm font-medium">
+                                        Delete
+                                    </button>
+                                )}
+                                <button onClick={handleSave} className="flex-1 bg-white text-black py-2 rounded-lg font-semibold hover:bg-neutral-200 transition-colors">
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const LifeCanvas = () => {
+            const [items, setItems] = useState([]);
+            const [activeView, setActiveView] = useState('today');
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [editingItem, setEditingItem] = useState(null);
+
+            // Load from localStorage
+            useEffect(() => {
+                const saved = localStorage.getItem('lifeCanvasItems');
+                if (saved) {
+                    setItems(JSON.parse(saved));
+                } else {
+                    // Initial demo data
+                    setItems([
+                        { id: 1, type: 'sticky', content: 'Welcome to Life Canvas! \nClick me to edit.', color: 'yellow', tags: ['welcome', 'demo'], createdAt: new Date().toISOString() },
+                        { id: 2, type: 'text', content: 'This is a text note. It has no background, just pure thought.', tags: ['thought'], createdAt: new Date().toISOString() },
+                        { id: 3, type: 'photo', content: 'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2940&q=80', tags: ['nature'], createdAt: new Date().toISOString() }
+                    ]);
+                }
+            }, []);
+
+            // Save to localStorage
+            useEffect(() => {
+                localStorage.setItem('lifeCanvasItems', JSON.stringify(items));
+            }, [items]);
+
+            const handleSaveItem = (newItem) => {
+                setItems(prev => {
+                    const exists = prev.find(i => i.id === newItem.id);
+                    if (exists) {
+                        return prev.map(i => i.id === newItem.id ? newItem : i);
+                    }
+                    return [newItem, ...prev];
+                });
+            };
+
+            const handleDeleteItem = (id) => {
+                setItems(prev => prev.filter(i => i.id !== id));
+            };
+
+            const openNewModal = () => {
+                setEditingItem(null);
+                setIsModalOpen(true);
+            };
+
+            const openEditModal = (item) => {
+                setEditingItem(item);
+                setIsModalOpen(true);
+            };
+
+            // Filter Logic
+            const filteredItems = useMemo(() => {
+                const now = new Date();
+                return items.filter(item => {
+                    const itemDate = new Date(item.createdAt);
+                    
+                    switch (activeView) {
+                        case 'today':
+                            return itemDate.toDateString() === now.toDateString();
+                        case 'month':
+                            return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
+                        case 'year':
+                            return itemDate.getFullYear() === now.getFullYear();
+                        case 'life':
+                            return true; // All items
+                        case 'past':
+                            return itemDate < new Date(now.setHours(0,0,0,0)); // Before today
+                        default:
+                            return true;
+                    }
+                });
+            }, [items, activeView]);
+
+            // Masonry Layout Logic (Simple Column Distribution)
+            const columns = useMemo(() => {
+                const cols = [[], [], []]; // 3 columns
+                filteredItems.forEach((item, i) => {
+                    cols[i % 3].push(item);
+                });
+                return cols;
+            }, [filteredItems]);
+
+            return (
+                <div className="min-h-screen bg-canvas text-white flex flex-col md:flex-row">
+                    <Sidebar activeView={activeView} setActiveView={setActiveView} />
+                    
+                    <main className="flex-1 p-4 md:p-8 md:ml-20 pb-24 md:pb-8">
+                        <header className="flex justify-between items-center mb-8">
+                            <div>
+                                <h1 className="text-3xl font-bold tracking-tight">Life Canvas</h1>
+                                <p className="text-neutral-500 text-sm mt-1 capitalize">{activeView.replace(/([A-Z])/g, ' $1').trim()}</p>
+                            </div>
+                            <button 
+                                onClick={openNewModal}
+                                className="bg-white text-black rounded-full p-3 shadow-lg hover:scale-110 transition-transform active:scale-95"
+                            >
+                                <Plus size={24} />
+                            </button>
+                        </header>
+
+                        {/* Masonry Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {columns.map((col, colIndex) => (
+                                <div key={colIndex} className="flex flex-col gap-4">
+                                    {col.map(item => (
+                                        <Item key={item.id} item={item} onClick={openEditModal} />
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+
+                        {filteredItems.length === 0 && (
+                            <div className="text-center text-neutral-600 mt-20">
+                                <p>No items found for this view.</p>
+                                <button onClick={openNewModal} className="text-blue-400 hover:underline mt-2">Create one?</button>
+                            </div>
+                        )}
+                    </main>
+
+                    <Modal 
+                        isOpen={isModalOpen} 
+                        onClose={() => setIsModalOpen(false)} 
+                        item={editingItem} 
+                        onSave={handleSaveItem}
+                        onDelete={handleDeleteItem}
+                    />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<LifeCanvas />);
+    </script>
+</body>
+</html>
