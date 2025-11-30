@@ -29,9 +29,9 @@ function App() {
         } else {
             // Initial demo data
             setItems([
-                { id: 1, type: 'sticky', content: 'Singapore Fuji-Film Recepie\n\nClassic Chrome\nDynamic Range: DR400\nHighlight: -1\nShadow: -1\nColor: +2', color: 'yellow', tags: ['photo', 'recipe'], emoji: '📸', createdAt: new Date().toISOString(), x: 100, y: 100 },
-                { id: 2, type: 'photo', content: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80', tags: ['camera'], emoji: '🎞️', createdAt: new Date().toISOString(), x: 400, y: 150 },
-                { id: 3, type: 'sticky', content: 'Remember to buy film rolls for the trip!', color: 'pink', tags: ['todo'], emoji: '✈️', createdAt: new Date().toISOString(), x: 700, y: 100 }
+                { id: 1, type: 'sticky', content: 'Singapore Fuji-Film Recepie\n\nClassic Chrome\nDynamic Range: DR400\nHighlight: -1\nShadow: -1\nColor: +2', color: 'yellow', tags: ['photo', 'recipe'], emoji: '📸', createdAt: new Date().toISOString(), x: 100, y: 100, tab: 'today' },
+                { id: 2, type: 'photo', content: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80', tags: ['camera'], emoji: '🎞️', createdAt: new Date().toISOString(), x: 400, y: 150, tab: 'month' },
+                { id: 3, type: 'sticky', content: 'Remember to buy film rolls for the trip!', color: 'pink', tags: ['todo'], emoji: '✈️', createdAt: new Date().toISOString(), x: 700, y: 100, tab: 'year' }
             ]);
         }
     }, []);
@@ -47,15 +47,21 @@ function App() {
             if (exists) {
                 return prev.map(i => i.id === newItem.id ? { ...i, ...newItem } : i);
             }
-            // New item: Place in center of screen (approx)
+            // New item
             const x = 100 + Math.random() * 200;
             const y = 100 + Math.random() * 100;
-            return [...prev, { ...newItem, x, y }];
+            const tab = activeView === 'past' ? 'today' : activeView;
+            return [...prev, { ...newItem, x, y, tab }];
         });
     };
 
     const handleDeleteItem = (id) => {
         setItems(prev => prev.filter(i => i.id !== id));
+    };
+
+    const handleMoveToPast = (id) => {
+        setItems(prev => prev.map(i => i.id === id ? { ...i, movedToPast: true } : i));
+        setIsModalOpen(false);
     };
 
     const handleDragStart = () => {
@@ -71,7 +77,6 @@ function App() {
             item.id === id ? { ...item, x: data.x, y: data.y } : item
         ));
 
-        // Reset dragging state after a short delay to allow onClick to check it
         setTimeout(() => {
             isDragging.current = false;
         }, 100);
@@ -85,30 +90,41 @@ function App() {
     };
 
     const openNewModal = (type = 'sticky') => {
-        setEditingItem({ type }); // Pre-set type
+        setEditingItem({ type });
         setIsModalOpen(true);
+    };
+
+    // Expiration Helper
+    const checkExpiration = (item) => {
+        if (item.movedToPast) return true;
+        if (item.tab === 'life') return false;
+
+        const created = new Date(item.createdAt);
+        const now = new Date();
+
+        if (item.tab === 'today') {
+            return created.toDateString() !== now.toDateString();
+        }
+        if (item.tab === 'month') {
+            return created.getMonth() !== now.getMonth() || created.getFullYear() !== now.getFullYear();
+        }
+        if (item.tab === 'year') {
+            return created.getFullYear() !== now.getFullYear();
+        }
+        return false;
     };
 
     // Filter Logic
     const filteredItems = useMemo(() => {
-        const now = new Date();
         return items.filter(item => {
-            const itemDate = new Date(item.createdAt);
+            const itemTab = item.tab || 'today';
+            const isExpired = checkExpiration({ ...item, tab: itemTab });
 
-            switch (activeView) {
-                case 'today':
-                    return itemDate.toDateString() === now.toDateString();
-                case 'month':
-                    return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
-                case 'year':
-                    return itemDate.getFullYear() === now.getFullYear();
-                case 'life':
-                    return true; // All items
-                case 'past':
-                    return itemDate < new Date(now.setHours(0, 0, 0, 0)); // Before today
-                default:
-                    return true;
+            if (activeView === 'past') {
+                return isExpired;
             }
+
+            return itemTab === activeView && !isExpired;
         });
     }, [items, activeView]);
 
@@ -181,6 +197,7 @@ function App() {
                 item={editingItem}
                 onSave={handleSaveItem}
                 onDelete={handleDeleteItem}
+                onMoveToPast={handleMoveToPast}
             />
         </div>
     );
